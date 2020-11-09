@@ -1,0 +1,36 @@
+---
+title: "test"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+BAHCS-10 total scores 
+Get Tobacco scores
+```{r}
+setwd("T:/CRI_Research/telehealth_evaluation/CCHBC_big_picture/social_determinants_of_health_docs/Data")
+bachs_10 = read.csv("Health Home - HCS - Qlikview.csv", header= TRUE)
+bachs_10 = bachs_10[c("Universal.Client.ID", "HCS.Assessment.Date", "HCS.Total.Score", "Client.Model.Time.Point")]
+tobacco = read.csv("Health Home - Tobacco - Qlikview.csv", header = TRUE)
+tobacco = tobacco[c("Universal.Client.ID", "Tobacco.Screen.Date", "Client.Model.Time.Point", "Uses.Tobacco")]
+```
+Merge both data sets
+Go ahead and remove missing data, because there is only missing data two on the two variables so it is the same pairwise deletion.
+```{r}
+bachs_10_tob = merge(bachs_10, tobacco, by = "Universal.Client.ID", all.y = TRUE)
+dim(bachs_10_tob)
+describe.factor(bachs_10_tob$HCS.Total.Score)
+### Remove Client.Model.Time.Point.x, because you merged on y and all of y version is complete
+bachs_10_tob$Client.Model.Time.Point.x = NULL
+
+library(naniar)
+miss_var_summary(bachs_10_tob)
+bachs_10_tob_complete = na.omit(bachs_10_tob)
+bachs_10_tob_complete
+
+describe.factor(bachs_10_tob_complete$Client.Model.Time.Point.y)
+```
+Identify and remove duplicates
+Add a time variable (just recode )
