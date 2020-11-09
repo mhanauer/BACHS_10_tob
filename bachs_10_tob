@@ -59,8 +59,10 @@ bachs_10_tob_complete_intake = subset(bachs_10_tob_complete, Client.Model.Time.P
 ### Not enough data for this model
 bachs_10_tob_complete_6_months = subset(bachs_10_tob_complete, Client.Model.Time.Point.x == "6 Month" & Client.Model.Time.Point.y == "6 Month")
 dim(bachs_10_tob_complete_6_months)
-### Let's
-
+### Let's get predictive validity
+bachs_10_tob_complete_intake_hcs_6_months_tob = subset(bachs_10_tob_complete, Client.Model.Time.Point.x == "Intake" & Client.Model.Time.Point.y == "6 Month")
+dim(bachs_10_tob_complete_intake_hcs_6_months_tob)
+bachs_10_tob_complete_intake_hcs_6_months_tob
 ```
 Quick descirptives
 ```{r}
@@ -71,10 +73,10 @@ mean(bachs_10_tob_complete_intake$HCS.Total.Score)
 sd(bachs_10_tob_complete_intake$HCS.Total.Score)
 
 ### 6-months
-describe.factor(bachs_10_tob_complete_6_months$Uses.Tobacco)
-dim(bachs_10_tob_complete_6_months)[1]
-mean(bachs_10_tob_complete_6_months$HCS.Total.Score)
-sd(bachs_10_tob_complete_6_months$HCS.Total.Score)
+describe.factor(bachs_10_tob_complete_intake_hcs_6_months_tob$Uses.Tobacco)
+dim(bachs_10_tob_complete_intake_hcs_6_months_tob)[1]
+mean(bachs_10_tob_complete_intake_hcs_6_months_tob$HCS.Total.Score)
+sd(bachs_10_tob_complete_intake_hcs_6_months_tob$HCS.Total.Score)
 
 
 ```
@@ -84,9 +86,14 @@ sd(bachs_10_tob_complete_6_months$HCS.Total.Score)
 Point biserial with tobacco and hcs at intake and intake and 6-months
 ```{r}
 library(ltm)
+library(polycor)
 
+polyserial(bachs_10_tob_complete_intake$HCS.Total.Score, bachs_10_tob_complete_intake$Uses.Tobacco)
+cor.test(bachs_10_tob_complete_intake$HCS.Total.Score, bachs_10_tob_complete_intake$Uses.Tobacco, method = "spearman", alternative = "less")
 
-biserial.cor(bachs_10_tob_complete_intake$HCS.Total.Score, bachs_10_tob_complete_intake$Uses.Tobacco)
+polyserial(bachs_10_tob_complete_intake_hcs_6_months_tob$HCS.Total.Score, bachs_10_tob_complete_intake_hcs_6_months_tob$Uses.Tobacco)
+
+cor.test(bachs_10_tob_complete_intake_hcs_6_months_tob$HCS.Total.Score, bachs_10_tob_complete_intake_hcs_6_months_tob$Uses.Tobacco)
 
 ```
 
