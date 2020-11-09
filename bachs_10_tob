@@ -189,8 +189,14 @@ hcs_healthcare$inpat_mental_diff = hcs_healthcare$days_inpatient_psychiatric.y -
 hcs_healthcare$er_diff = hcs_healthcare$er_visits.y - hcs_healthcare$er_visits.x
 ```
 Quick look at descriptive
+Just use complete data set easier
 ```{r}
-dim(hcs_healthcare)[1]
+miss_var_summary(hcs_healthcare)
+hcs_healthcare = na.omit(hcs_healthcare)
+n = dim(hcs_healthcare)[1]
+n 
+range(hcs_healthcare$Assessment.Date.x)
+range(hcs_healthcare$Assessment.Date.y)
 apply(hcs_healthcare[,20:22], 2, function(x){describe.factor(x)})
 mean(hcs_healthcare$bhcs_diff)
 sd(hcs_healthcare$bhcs_diff)
@@ -209,38 +215,33 @@ list_output
 Ok now try putting together model for difference in health home model
 Just sum the inpatient results together
 ```{r}
-hcs_healthcare$inpat_all = sum(hcs_healthcare$inpat_med_diff, hcs_healthcare$inpat_mental_diff)
-hcs_healthcare
-
+hcs_healthcare$inpat_all = hcs_healthcare$inpat_med_diff + hcs_healthcare$inpat_mental_diff
+hcs_healthcare_ut = hcs_healthcare[c("er_diff", "inpat_all")]
+summary(hcs_healthcare_ut)
+er_cost = sum(hcs_healthcare$er_diff *5680.56)
+hos_cost = sum(hcs_healthcare$inpat_all * 2534.62)
+total_cost = sum(er_cost + hos_cost)
+total_cost
 ```
 Get the table
 ```{r}
 library(dplyr)
-tab_dat = matrix(c("ER", "hospital", "jail", "part_time", "full_time", "Total", 5680.56, 2534.62, 103.53, 1740, 3480, "", sum_er_diff, sum_hos_diff, sum_jail_diff, sum_part_diff, sum_full_diff, "", er_cost, hos_cost, jail_cost, part_cost, full_cost, total_cost), nrow = 6)
+tab_dat = matrix(c("ER", "hospital", "Total", 5680.56, 2534.62, "", sum(hcs_healthcare_ut$er_diff), sum(hcs_healthcare_ut$inpat_all), "", er_cost, hos_cost, total_cost), nrow = 3)
 tab_dat = data.frame(tab_dat)
 colnames(tab_dat) = c("measure", "savings_per_unit", "unit_difference", "cost_savings")
 tab_dat
 library(gt)
-title_tab_dat = c(paste0("Cost saving and job benefits from NOMS data 6-1-20", " ", "n","=", dim(healthcare_dat)[1]))
+title_tab_dat = c(paste0("Cost saving from Healthlink data from 2019-01-07 to 2019-07-25", " ", "n","=", dim(hcs_healthcare_ut)[1]))
 ### Add title, change names of measure, make $, add footnote for part and full time cost savings, add footnote for average saving percentage to make it clear what the units are.
-tab_dat$measure = recode(tab_dat$measure, "part_time" = "Part time", "jail"= "Jail", "hospital" = "Hospital", "full_time" = "Full time")
+tab_dat$measure = recode(tab_dat$measure, "hospital" = "Hospital")
 write.csv(tab_dat, "tab_dat.csv", row.names = FALSE)
 tab_dat = read.csv("tab_dat.csv", header = TRUE)
 tab_dat_table =  gt(tab_dat) %>%
   tab_header(title = title_tab_dat) %>%
   tab_footnote(footnote = "Unit is change in number of ER visits",  locations = cells_body(columns = vars(unit_difference), rows = 1)) %>%
-  tab_footnote(footnote = "Unit is change in number of days",  locations = cells_body(columns = vars(unit_difference), rows = c(2,3))) %>%
-  tab_footnote(footnote = "Unit is change in number for part / full time jobs",  locations = cells_body(columns = vars(unit_difference), rows = c(4,5)))%>%
+  tab_footnote(footnote = "Unit is change in number of days",  locations = cells_body(columns = vars(unit_difference), rows = c(2))) %>%
   fmt_currency(columns = vars(savings_per_unit, cost_savings))%>%
-  tab_footnote(footnote = "Full time and part-time amounts have a negative sign added to them before creating the total to put them in the same direction as cost savings",  locations = cells_body(columns = vars(cost_savings), rows = c(4,5)))%>%
   cols_label(measure = md("Measure"), savings_per_unit = md("Savings per unit"), unit_difference = md("Unit"), cost_savings = md("Cost savings"))
 tab_dat_table
-gtsave(tab_dat_table, "tab_dat_table.png")   
+gtsave(tab_dat_table, "tab_dat_table.png")    
 ```
-
-
-
-
-
-
-
