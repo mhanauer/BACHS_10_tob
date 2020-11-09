@@ -124,7 +124,119 @@ polyserial(bachs_10_tob_complete_intake_hcs_3_months_tob$HCS.Total.Score, bachs_
 
 cor.test(bachs_10_tob_complete_intake_hcs_3_months_tob$HCS.Total.Score, bachs_10_tob_complete_intake_hcs_3_months_tob$Uses.Tobacco)
 ```
+Let's try HCS and utilization
+Let's try intake and relationship between inpatient and ER visits
+I don't know which intakes are associated with which follow ups to create an episode of care.
+```{r}
+setwd("T:/CRI_Research/telehealth_evaluation/CCHBC_big_picture/social_determinants_of_health_docs/Data")
+hcs_healthcare = read.csv("Healthlink - HCS - Redcap.csv", header =TRUE)
+#Client.ID, Record.ID, Assessment.Date, Time.point, My.Score
+healthcare =  hcs_healthcare[,20:22]
+names(healthcare) = c("days_inpatient_medical", "days_inpatient_psychiatric", "er_visits")
+hcs_healthcare = hcs_healthcare[c("Client.ID", "Record.ID", "Assessment.Date", "Time.point", "My.Score.")]
+hcs_healthcare = data.frame(hcs_healthcare, healthcare)
+hcs_healthcare$Assessment.Date = mdy(hcs_healthcare$Assessment.Date)
+hcs_healthcare = hcs_healthcare[order(hcs_healthcare$Client.ID, hcs_healthcare$Time.point, hcs_healthcare$Assessment.Date),]
+describe.factor(hcs_healthcare$Time.point)
+### Make numeric
+hcs_healthcare$days_inpatient_psychiatric = as.numeric(hcs_healthcare$days_inpatient_psychiatric)
 
+### Need to remove the duplicates start with removing the intake duplicates
+hcs_healthcare_intake = subset(hcs_healthcare, Time.point == "Baseline Assessment")
+### Create a client.id and time.point variable
+hcs_healthcare_intake$client_id_time_point = paste0(hcs_healthcare_intake$Client.ID, hcs_healthcare_intake$Time.point)
+hcs_healthcare_intake = distinct(hcs_healthcare_intake, client_id_time_point, .keep_all = TRUE)
+hcs_healthcare_intake
+```
+Check out descriptives
+```{r}
+apply(hcs_healthcare_intake[,6:8], 2, function(x){describe.factor(x)})
+```
+Relationship between first intake and inpatient visit for medical, psychiatric, or ER visits  spearman correlation
+```{r}
+
+list_fun = data.frame(days_inpatient_medical = hcs_healthcare_intake$days_inpatient_medical, days_inpatient_psychiatric = hcs_healthcare_intake$days_inpatient_psychiatric, er_visits = hcs_healthcare_intake$er_visits)
+list_output = list()
+
+for(i in 1:length(list_fun)){
+list_output[[i]] = cor.test(hcs_healthcare_intake$My.Score., list_fun[[i]], cor = "spearman", alternative = "less")
+}
+list_output
+```
+
+Let's look at the first baseline and first follow-up and see if there are differences in each of the three uses
+```{r}
+hcs_healthcare$client_id_time_point = paste0(hcs_healthcare$Client.ID, hcs_healthcare$Time.point)
+hcs_healthcare = distinct(hcs_healthcare, client_id_time_point, .keep_all = TRUE)
+hcs_healthcare
+### Separate and get baseline and follow-ups that match
+hcs_healthcare_intake= subset(hcs_healthcare, Time.point == "Baseline Assessment")
+hcs_healthcare_follow_up = subset(hcs_healthcare, Time.point == "Follow up Assessment")
+
+hcs_healthcare = merge(hcs_healthcare_intake, hcs_healthcare_follow_up, by = "Client.ID")
+dim(hcs_healthcare)
+hcs_healthcare = hcs_healthcare[order(hcs_healthcare$Client.ID),]
+hcs_healthcare
+### If the baseline date is after the follow-up date remove
+hcs_healthcare$bad_date = ifelse(hcs_healthcare$Assessment.Date.x >= hcs_healthcare$Assessment.Date.y, 1, 0)
+describe.factor(hcs_healthcare$bad_date)
+hcs_healthcare = subset(hcs_healthcare, bad_date == 0)
+hcs_healthcare
+### Create BHC diff and ER diff scores
+hcs_healthcare$bhcs_diff = hcs_healthcare$My.Score..y - hcs_healthcare$My.Score..x
+hcs_healthcare$inpat_med_diff = hcs_healthcare$days_inpatient_medical.y - hcs_healthcare$days_inpatient_medical.x
+hcs_healthcare$inpat_mental_diff = hcs_healthcare$days_inpatient_psychiatric.y - hcs_healthcare$days_inpatient_psychiatric.x
+hcs_healthcare$er_diff = hcs_healthcare$er_visits.y - hcs_healthcare$er_visits.x
+```
+Quick look at descriptive
+```{r}
+dim(hcs_healthcare)[1]
+apply(hcs_healthcare[,20:22], 2, function(x){describe.factor(x)})
+mean(hcs_healthcare$bhcs_diff)
+sd(hcs_healthcare$bhcs_diff)
+```
+Look at correlations first then differences
+```{r}
+
+list_fun = data.frame(inpat_med_diff = hcs_healthcare$inpat_med_diff, inpat_mental_diff = hcs_healthcare$inpat_mental_diff, er_diff = hcs_healthcare$er_diff)
+list_output = list()
+
+for(i in 1:length(list_fun)){
+list_output[[i]] = cor.test(hcs_healthcare$bhcs_diff, list_fun[[i]], cor = "spearman")
+}
+list_output
+```
+Ok now try putting together model for difference in health home model
+Just sum the inpatient results together
+```{r}
+hcs_healthcare$inpat_all = sum(hcs_healthcare$inpat_med_diff, hcs_healthcare$inpat_mental_diff)
+hcs_healthcare
+
+```
+Get the table
+```{r}
+library(dplyr)
+tab_dat = matrix(c("ER", "hospital", "jail", "part_time", "full_time", "Total", 5680.56, 2534.62, 103.53, 1740, 3480, "", sum_er_diff, sum_hos_diff, sum_jail_diff, sum_part_diff, sum_full_diff, "", er_cost, hos_cost, jail_cost, part_cost, full_cost, total_cost), nrow = 6)
+tab_dat = data.frame(tab_dat)
+colnames(tab_dat) = c("measure", "savings_per_unit", "unit_difference", "cost_savings")
+tab_dat
+library(gt)
+title_tab_dat = c(paste0("Cost saving and job benefits from NOMS data 6-1-20", " ", "n","=", dim(healthcare_dat)[1]))
+### Add title, change names of measure, make $, add footnote for part and full time cost savings, add footnote for average saving percentage to make it clear what the units are.
+tab_dat$measure = recode(tab_dat$measure, "part_time" = "Part time", "jail"= "Jail", "hospital" = "Hospital", "full_time" = "Full time")
+write.csv(tab_dat, "tab_dat.csv", row.names = FALSE)
+tab_dat = read.csv("tab_dat.csv", header = TRUE)
+tab_dat_table =  gt(tab_dat) %>%
+  tab_header(title = title_tab_dat) %>%
+  tab_footnote(footnote = "Unit is change in number of ER visits",  locations = cells_body(columns = vars(unit_difference), rows = 1)) %>%
+  tab_footnote(footnote = "Unit is change in number of days",  locations = cells_body(columns = vars(unit_difference), rows = c(2,3))) %>%
+  tab_footnote(footnote = "Unit is change in number for part / full time jobs",  locations = cells_body(columns = vars(unit_difference), rows = c(4,5)))%>%
+  fmt_currency(columns = vars(savings_per_unit, cost_savings))%>%
+  tab_footnote(footnote = "Full time and part-time amounts have a negative sign added to them before creating the total to put them in the same direction as cost savings",  locations = cells_body(columns = vars(cost_savings), rows = c(4,5)))%>%
+  cols_label(measure = md("Measure"), savings_per_unit = md("Savings per unit"), unit_difference = md("Unit"), cost_savings = md("Cost savings"))
+tab_dat_table
+gtsave(tab_dat_table, "tab_dat_table.png")   
+```
 
 
 
