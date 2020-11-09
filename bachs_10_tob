@@ -9,28 +9,91 @@ knitr::opts_chunk$set(echo = TRUE)
 
 BAHCS-10 total scores 
 Get Tobacco scores
+Change tobacco scores
 ```{r}
 setwd("T:/CRI_Research/telehealth_evaluation/CCHBC_big_picture/social_determinants_of_health_docs/Data")
 bachs_10 = read.csv("Health Home - HCS - Qlikview.csv", header= TRUE)
 bachs_10 = bachs_10[c("Universal.Client.ID", "HCS.Assessment.Date", "HCS.Total.Score", "Client.Model.Time.Point")]
 tobacco = read.csv("Health Home - Tobacco - Qlikview.csv", header = TRUE)
 tobacco = tobacco[c("Universal.Client.ID", "Tobacco.Screen.Date", "Client.Model.Time.Point", "Uses.Tobacco")]
+tobacco$Uses.Tobacco = ifelse(tobacco$Uses.Tobacco == "Yes", 1, 0)
+
 ```
 Merge both data sets
 Go ahead and remove missing data, because there is only missing data two on the two variables so it is the same pairwise deletion.
 ```{r}
+library(lubridate)
 bachs_10_tob = merge(bachs_10, tobacco, by = "Universal.Client.ID", all.y = TRUE)
 dim(bachs_10_tob)
 describe.factor(bachs_10_tob$HCS.Total.Score)
-### Remove Client.Model.Time.Point.x, because you merged on y and all of y version is complete
-bachs_10_tob$Client.Model.Time.Point.x = NULL
-
 library(naniar)
 miss_var_summary(bachs_10_tob)
 bachs_10_tob_complete = na.omit(bachs_10_tob)
+bachs_10_tob_complete$HCS.Assessment.Date = ymd(bachs_10_tob_complete$HCS.Assessment.Date)
+bachs_10_tob_complete$Tobacco.Screen.Date = ymd(bachs_10_tob_complete$Tobacco.Screen.Date)
+bachs_10_tob_complete
+## Order by ID and HCS assessment date
+bachs_10_tob_complete = bachs_10_tob_complete[order(bachs_10_tob_complete$Universal.Client.ID, bachs_10_tob_complete$HCS.Assessment.Date),]
 bachs_10_tob_complete
 
-describe.factor(bachs_10_tob_complete$Client.Model.Time.Point.y)
 ```
 Identify and remove duplicates
-Add a time variable (just recode )
+The dates for tobacco screening and timepoints do not align with HCS dates.  There are several years differences.
+Create a new ID with universal id and HCS date and same for tob date
+```{r}
+
+bachs_10_tob_complete$id_HCS_date = paste0(bachs_10_tob_complete$Universal.Client.ID, bachs_10_tob_complete$HCS.Assessment.Date)
+bachs_10_tob_complete = distinct(bachs_10_tob_complete, id_HCS_date, .keep_all = TRUE)
+bachs_10_tob_complete$id_tob_date = paste0(bachs_10_tob_complete$Universal.Client.ID, bachs_10_tob_complete$Tobacco.Screen.Date)
+bachs_10_tob_complete = distinct(bachs_10_tob_complete, id_tob_date, .keep_all = TRUE)
+bachs_10_tob_complete
+```
+
+
+
+Let's create an intake and 6-month data sets
+```{r}
+bachs_10_tob_complete_intake = subset(bachs_10_tob_complete, Client.Model.Time.Point.x == "Intake" & Client.Model.Time.Point.y == "Intake")
+
+
+### Not enough data for this model
+bachs_10_tob_complete_6_months = subset(bachs_10_tob_complete, Client.Model.Time.Point.x == "6 Month" & Client.Model.Time.Point.y == "6 Month")
+dim(bachs_10_tob_complete_6_months)
+### Let's
+
+```
+Quick descirptives
+```{r}
+
+describe.factor(bachs_10_tob_complete_intake$Uses.Tobacco)
+dim(bachs_10_tob_complete_intake)[1]
+mean(bachs_10_tob_complete_intake$HCS.Total.Score)
+sd(bachs_10_tob_complete_intake$HCS.Total.Score)
+
+### 6-months
+describe.factor(bachs_10_tob_complete_6_months$Uses.Tobacco)
+dim(bachs_10_tob_complete_6_months)[1]
+mean(bachs_10_tob_complete_6_months$HCS.Total.Score)
+sd(bachs_10_tob_complete_6_months$HCS.Total.Score)
+
+
+```
+
+
+
+Point biserial with tobacco and hcs at intake and intake and 6-months
+```{r}
+library(ltm)
+
+
+biserial.cor(bachs_10_tob_complete_intake$HCS.Total.Score, bachs_10_tob_complete_intake$Uses.Tobacco)
+
+```
+
+
+
+
+
+
+
+
