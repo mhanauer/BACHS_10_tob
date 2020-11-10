@@ -144,7 +144,7 @@ hcs_healthcare_intake$client_id_time_point = paste0(hcs_healthcare_intake$Client
 hcs_healthcare_intake = distinct(hcs_healthcare_intake, client_id_time_point, .keep_all = TRUE)
 
 ```
-Check out descriptives
+Check out descriptives for intake
 ```{r}
 dim(hcs_healthcare_intake)[1]
 apply(hcs_healthcare_intake[,6:9], 2, function(x){describe.factor(x)})
@@ -154,7 +154,7 @@ Relationship between first intake and inpatient visit for medical, psychiatric, 
 cor.test(hcs_healthcare_intake$My.Score., hcs_healthcare_intake$hos_er, correlation = "spearman", alterantive = "less")
 ```
 
-Let's look at the first baseline and first follow-up and see if there are differences in each of the three uses
+Let's look at the matched first baseline and first follow-up and see if there are differences
 ```{r}
 hcs_healthcare$client_id_time_point = paste0(hcs_healthcare$Client.ID, hcs_healthcare$Time.point)
 hcs_healthcare = distinct(hcs_healthcare, client_id_time_point, .keep_all = TRUE)
@@ -178,12 +178,11 @@ hcs_healthcare$inpat_med_diff = hcs_healthcare$days_inpatient_medical.y - hcs_he
 hcs_healthcare$inpat_mental_diff = hcs_healthcare$days_inpatient_psychiatric.y - hcs_healthcare$days_inpatient_psychiatric.x
 hcs_healthcare$er_diff = hcs_healthcare$er_visits.y - hcs_healthcare$er_visits.x
 ```
-Predictive validity: changes in HCS scores related to changes healthcare useage
-
-Quick look at descriptive
+Predictive validity: changes in HCS scores related to changes healthcare useage for matched first basline and first follow-up
 Just use complete data set easier
 ```{r}
 miss_var_summary(hcs_healthcare)
+dim(hcs_healthcare)[1]
 hcs_healthcare = na.omit(hcs_healthcare)
 n = dim(hcs_healthcare)[1]
 n 
@@ -193,7 +192,7 @@ apply(hcs_healthcare[,20:22], 2, function(x){describe.factor(x)})
 mean(hcs_healthcare$bhcs_diff)
 sd(hcs_healthcare$bhcs_diff)
 ```
-Look at correlations first then differences
+Look at correlations for first differneces 
 ```{r}
 
 list_fun = data.frame(inpat_med_diff = hcs_healthcare$inpat_med_diff, inpat_mental_diff = hcs_healthcare$inpat_mental_diff, er_diff = hcs_healthcare$er_diff)
@@ -204,7 +203,9 @@ list_output[[i]] = cor.test(hcs_healthcare$bhcs_diff, list_fun[[i]], cor = "spea
 }
 list_output
 ```
-Ok now try putting together model for difference in health home model
+####################################
+Healthcare cost analysis health home
+####################################
 Just sum the inpatient results together
 ```{r}
 hcs_healthcare$inpat_all = hcs_healthcare$inpat_med_diff + hcs_healthcare$inpat_mental_diff
@@ -215,15 +216,16 @@ hos_cost = sum(hcs_healthcare$inpat_all * 2534.62)
 total_cost = sum(er_cost + hos_cost)
 total_cost
 ```
-Get the table
+Table of results 
 ```{r}
 library(dplyr)
-tab_dat = matrix(c("ER", "hospital", "Total", 5680.56, 2534.62, "", sum(hcs_healthcare_ut$er_diff), sum(hcs_healthcare_ut$inpat_all), "", er_cost, hos_cost, total_cost), nrow = 3)
+tab_dat = matrix(c("ER", "hospital", "Total", 5680.56, 2534.62, "", sum(hcs_healthcare_ut$er_diff), 
+                   sum(hcs_healthcare_ut$inpat_all), "", er_cost, hos_cost, total_cost), nrow = 3)
 tab_dat = data.frame(tab_dat)
 colnames(tab_dat) = c("measure", "savings_per_unit", "unit_difference", "cost_savings")
 tab_dat
 library(gt)
-title_tab_dat = c(paste0("Cost saving from Healthlink data from 2019-01-07 to 2019-07-25", " ", "n","=", dim(hcs_healthcare_ut)[1]))
+title_tab_dat = c(paste0("Cost saving from Healthlink data from 2019-01-07 to 2019-11-05", " ", "n","=", dim(hcs_healthcare_ut)[1]))
 ### Add title, change names of measure, make $, add footnote for part and full time cost savings, add footnote for average saving percentage to make it clear what the units are.
 tab_dat$measure = recode(tab_dat$measure, "hospital" = "Hospital")
 write.csv(tab_dat, "tab_dat.csv", row.names = FALSE)
@@ -238,13 +240,7 @@ tab_dat_table
 gtsave(tab_dat_table, "tab_dat_table.png")    
 ```
 
-Test
-```{r}
-sat_samp = c(1,0)
-sat_dat = sample(size= 40, x = sat_samp, prob = c(.8, .2), replace = TRUE)
-sat_dat
-prop.test(sat_dat, p)
-```
+
 
 
 
