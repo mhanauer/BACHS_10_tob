@@ -19,12 +19,36 @@ tobacco = tobacco[c("Universal.Client.ID", "Tobacco.Screen.Date", "Client.Model.
 tobacco$Uses.Tobacco = ifelse(tobacco$Uses.Tobacco == "Yes", 1, 0)
 
 ```
+Identify and remove duplicates
+Many cases of IDs and timepoints being the same; however, assessment dates are way different
+Also, some cases of dates not aligning with their assessment date (i.e., 3-month happening a year after baseline / intake)
+For the sake of simplicity, just take the first instance of each timepoint.  So create the ID with ID and timepoint.
+
+```{r}
+library(dplyr)
+bachs_10$id_date = paste0(bachs_10$Universal.Client.ID, bachs_10$Client.Model.Time.Point)
+# Order by ID and timepoint first and date first, to make sure you are grabing the first instance of each timepoint based on the date
+bachs_10 = bachs_10[order(bachs_10$Universal.Client.ID, bachs_10$Client.Model.Time.Point, bachs_10$HCS.Assessment.Date),]
+
+bachs_10 = distinct(bachs_10, id_date, .keep_all = TRUE)
+
+tobacco$id_date = paste0(tobacco$Universal.Client.ID, tobacco$Client.Model.Time.Point)
+# Order by ID and timepoint first and date first, to make sure you are grabing the first instance of each timepoint based on the date
+tobacco = tobacco[order(tobacco$Universal.Client.ID, tobacco$Client.Model.Time.Point, tobacco$Tobacco.Screen.Date),]
+
+tobacco = distinct(tobacco, id_date, .keep_all = TRUE)
+
+```
+
+
 Merge both data sets
+Removing any BACHS-10 value below 10, because you cannot score below 10.
 Go ahead and remove missing data, because there is only missing data two on the two variables so it is the same pairwise deletion.
+Remove everything past 6-months that is enough time to see changes
 ```{r}
 library(lubridate)
 library(prettyR)
-bachs_10_tob = merge(bachs_10, tobacco, by = "Universal.Client.ID", all.y = TRUE)
+bachs_10_tob = merge(bachs_10, tobacco, by = "id_date")
 dim(bachs_10_tob)
 describe.factor(bachs_10_tob$HCS.Total.Score)
 library(naniar)
@@ -32,41 +56,30 @@ miss_var_summary(bachs_10_tob)
 bachs_10_tob_complete = na.omit(bachs_10_tob)
 bachs_10_tob_complete$HCS.Assessment.Date = ymd(bachs_10_tob_complete$HCS.Assessment.Date)
 bachs_10_tob_complete$Tobacco.Screen.Date = ymd(bachs_10_tob_complete$Tobacco.Screen.Date)
-bachs_10_tob_complete
+bachs_10_tob_complete$Universal.Client.ID.x = NULL
+bachs_10_tob_complete$Universal.Client.ID.y = NULL
 ## Order by ID and HCS assessment date
-bachs_10_tob_complete = bachs_10_tob_complete[order(bachs_10_tob_complete$Universal.Client.ID, bachs_10_tob_complete$HCS.Assessment.Date),]
+bachs_10_tob_complete = bachs_10_tob_complete[order(bachs_10_tob_complete$id_date),]
+bachs_10_tob_complete$Client.Model.Time.Point.y = NULL
+names(bachs_10_tob_complete)[4] = "Client.Model.Time.Point"
+
+bachs_10_tob_complete = subset(bachs_10_tob_complete, Client.Model.Time.Point == "Intake" | Client.Model.Time.Point == "3 Month" | Client.Model.Time.Point == "6 Month")
 bachs_10_tob_complete
-
-```
-Identify and remove duplicates
-The dates for tobacco screening and timepoints do not align with HCS dates.  There are several years differences.
-Create a new ID with universal id and HCS date and same for tob date
-```{r}
-library(dplyr)
-bachs_10_tob_complete$id_HCS_date = paste0(bachs_10_tob_complete$Universal.Client.ID, bachs_10_tob_complete$HCS.Assessment.Date)
-bachs_10_tob_complete = distinct(bachs_10_tob_complete, id_HCS_date, .keep_all = TRUE)
-bachs_10_tob_complete$id_tob_date = paste0(bachs_10_tob_complete$Universal.Client.ID, bachs_10_tob_complete$Tobacco.Screen.Date)
-bachs_10_tob_complete = distinct(bachs_10_tob_complete, id_tob_date, .keep_all = TRUE)
-describe.factor(bachs_10_tob_complete$Client.Model.Time.Point.x)
 ```
 
-
-
-Let's create an intake and 6-month data sets
+Let's create an intake, 3 month, and 6-month data sets
 ```{r}
-bachs_10_tob_complete_intake = subset(bachs_10_tob_complete, Client.Model.Time.Point.x == "Intake" & Client.Model.Time.Point.y == "Intake")
-
-### Let's get predictive validity at 6months
-bachs_10_tob_complete_intake_hcs_6_months_tob = subset(bachs_10_tob_complete, Client.Model.Time.Point.x == "Intake" & Client.Model.Time.Point.y == "6 Month")
-dim(bachs_10_tob_complete_intake_hcs_6_months_tob)
-bachs_10_tob_complete_intake_hcs_6_months_tob
+bachs_10_tob_complete_intake = subset(bachs_10_tob_complete, Client.Model.Time.Point == "Intake")
 
 ### Let's get predictive validity at 3months
-bachs_10_tob_complete_intake_hcs_3_months_tob = subset(bachs_10_tob_complete, Client.Model.Time.Point.x == "Intake" & Client.Model.Time.Point.y == "3 Month")
-dim(bachs_10_tob_complete_intake_hcs_3_months_tob)
-bachs_10_tob_complete_intake_hcs_3_months_tob
+bachs_10_tob_complete_3_months = subset(bachs_10_tob_complete, Client.Model.Time.Point == "3 Month")
+dim(bachs_10_tob_complete_3_months)
+bachs_10_tob_complete_3_months
 
-
+### Let's get predictive validity at 6months
+bachs_10_tob_complete_6_months = subset(bachs_10_tob_complete, Client.Model.Time.Point == "6 Month")
+dim(bachs_10_tob_complete_6_months)
+bachs_10_tob_complete_6_months
 ```
 Quick descirptives
 ```{r}
@@ -79,19 +92,19 @@ library(descr)
 compmeans(bachs_10_tob_complete_intake$HCS.Total.Score, bachs_10_tob_complete_intake$Uses.Tobacco)
 
 ### 6-months
-describe.factor(bachs_10_tob_complete_intake_hcs_6_months_tob$Uses.Tobacco)
-dim(bachs_10_tob_complete_intake_hcs_6_months_tob)[1]
-mean(bachs_10_tob_complete_intake_hcs_6_months_tob$HCS.Total.Score)
-sd(bachs_10_tob_complete_intake_hcs_6_months_tob$HCS.Total.Score)
-compmeans(bachs_10_tob_complete_intake_hcs_6_months_tob$HCS.Total.Score, bachs_10_tob_complete_intake_hcs_6_months_tob$Uses.Tobacco)
+describe.factor(bachs_10_tob_complete_6_months$Uses.Tobacco)
+dim(bachs_10_tob_complete_6_months)[1]
+mean(bachs_10_tob_complete_6_months$HCS.Total.Score)
+sd(bachs_10_tob_complete_6_months$HCS.Total.Score)
+compmeans(bachs_10_tob_complete_6_months$HCS.Total.Score, bachs_10_tob_complete_6_months$Uses.Tobacco)
 
 #3-months
 ### 6-months
-describe.factor(bachs_10_tob_complete_intake_hcs_3_months_tob$Uses.Tobacco)
-dim(bachs_10_tob_complete_intake_hcs_3_months_tob)[1]
-mean(bachs_10_tob_complete_intake_hcs_3_months_tob$HCS.Total.Score)
-sd(bachs_10_tob_complete_intake_hcs_3_months_tob$HCS.Total.Score)
-compmeans(bachs_10_tob_complete_intake_hcs_3_months_tob$HCS.Total.Score, bachs_10_tob_complete_intake_hcs_3_months_tob$Uses.Tobacco)
+describe.factor(bachs_10_tob_complete_3_months$Uses.Tobacco)
+dim(bachs_10_tob_complete_3_months)[1]
+mean(bachs_10_tob_complete_3_months$HCS.Total.Score)
+sd(bachs_10_tob_complete_3_months$HCS.Total.Score)
+compmeans(bachs_10_tob_complete_3_months$HCS.Total.Score, bachs_10_tob_complete_3_months$Uses.Tobacco)
 
 ```
 
@@ -105,24 +118,19 @@ library(polycor)
 #Intake
 hist(bachs_10_tob_complete_intake$HCS.Total.Score)
 qqnorm(bachs_10_tob_complete_intake$HCS.Total.Score)
-polyserial(bachs_10_tob_complete_intake$HCS.Total.Score, bachs_10_tob_complete_intake$Uses.Tobacco)
 cor.test(bachs_10_tob_complete_intake$HCS.Total.Score, bachs_10_tob_complete_intake$Uses.Tobacco, alternative = "less")
-
+cor.test(bachs_10_tob_complete_intake$HCS.Total.Score, bachs_10_tob_complete_intake$Uses.Tobacco, method = "spearman", alternative = "less")
 #6-months
-hist(bachs_10_tob_complete_intake_hcs_6_months_tob$HCS.Total.Score)
-qqnorm(bachs_10_tob_complete_intake_hcs_6_months_tob$HCS.Total.Score)
-
-polyserial(bachs_10_tob_complete_intake_hcs_6_months_tob$HCS.Total.Score, bachs_10_tob_complete_intake_hcs_6_months_tob$Uses.Tobacco)
-
-cor.test(bachs_10_tob_complete_intake_hcs_6_months_tob$HCS.Total.Score, bachs_10_tob_complete_intake_hcs_6_months_tob$Uses.Tobacco)
+hist(bachs_10_tob_complete_6_months$HCS.Total.Score)
+qqnorm(bachs_10_tob_complete_6_months$HCS.Total.Score)
+cor.test(bachs_10_tob_complete_6_months$HCS.Total.Score, bachs_10_tob_complete_6_months$Uses.Tobacco, alternative = "less")
+cor.test(bachs_10_tob_complete_6_months$HCS.Total.Score, bachs_10_tob_complete_6_months$Uses.Tobacco,  method = "spearman", alternative = "less")
 
 #3-months
-hist(bachs_10_tob_complete_intake_hcs_3_months_tob$HCS.Total.Score)
-qqnorm(bachs_10_tob_complete_intake_hcs_3_months_tob$HCS.Total.Score)
+hist(bachs_10_tob_complete_3_months$HCS.Total.Score)
+qqnorm(bachs_10_tob_complete_3_months$HCS.Total.Score)
+cor.test(bachs_10_tob_complete_3_months$HCS.Total.Score, bachs_10_tob_complete_3_months$Uses.Tobacco, alternative = "less")
 
-polyserial(bachs_10_tob_complete_intake_hcs_3_months_tob$HCS.Total.Score, bachs_10_tob_complete_intake_hcs_3_months_tob$Uses.Tobacco)
-
-cor.test(bachs_10_tob_complete_intake_hcs_3_months_tob$HCS.Total.Score, bachs_10_tob_complete_intake_hcs_3_months_tob$Uses.Tobacco)
 ```
 Let's try HCS and utilization
 Let's try intake and relationship between inpatient and ER visits
