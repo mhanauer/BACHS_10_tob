@@ -68,13 +68,10 @@ bachs_10_tob_complete
 ### Create a time variable
 describe.factor(bachs_10_tob_complete$Client.Model.Time.Point)
 bachs_10_tob_complete$time = ifelse(bachs_10_tob_complete$Client.Model.Time.Point == "Intake", 0, ifelse(bachs_10_tob_complete$Client.Model.Time.Point == "3 Month", 1, ifelse(bachs_10_tob_complete$Client.Model.Time.Point == "6 Month", 2, "Wrong")))
-```
-
-Let's create an intake, 3 month, and 6-month data sets
-```{r}
+### Create intake only data set
 bachs_10_tob_complete_intake = subset(bachs_10_tob_complete, Client.Model.Time.Point == "Intake")
-
 ```
+
 Quick descirptives for intake
 ```{r}
 
@@ -85,12 +82,16 @@ sd(bachs_10_tob_complete_intake$HCS.Total.Score)
 library(descr)
 compmeans(bachs_10_tob_complete_intake$HCS.Total.Score, bachs_10_tob_complete_intake$Uses.Tobacco)
 
+```
+Concurrent validity
+```{r}
 #Intake
 hist(bachs_10_tob_complete_intake$HCS.Total.Score)
 qqnorm(bachs_10_tob_complete_intake$HCS.Total.Score)
 cor.test(bachs_10_tob_complete_intake$HCS.Total.Score, bachs_10_tob_complete_intake$Uses.Tobacco, alternative = "less")
-
 ```
+
+
 Quick descirptives for all
 ```{r}
 describe.factor(bachs_10_tob_complete$Uses.Tobacco)
@@ -119,9 +120,7 @@ bayes_p_change_al_tob_sum
 HCS and Healthcare utilization concurrent and predictive
 #########################################
 
-Let's try HCS and utilization
-Let's try intake and relationship between inpatient and ER visits
-I don't know which intakes are associated with which follow ups to create an episode of care.
+Data cleaning for healthcare utilization for concurrent and predictive
 ```{r}
 setwd("T:/CRI_Research/telehealth_evaluation/CCHBC_big_picture/social_determinants_of_health_docs/Data")
 hcs_healthcare = read.csv("Healthlink - HCS - Redcap.csv", header =TRUE)
@@ -149,12 +148,12 @@ Check out descriptives for intake
 dim(hcs_healthcare_intake)[1]
 apply(hcs_healthcare_intake[,6:9], 2, function(x){describe.factor(x)})
 ```
-Relationship between first intake and inpatient visit for medical, psychiatric, or ER visits  spearman correlation
+Conncurrent validity with intake hcs and hos_er
 ```{r}
 cor.test(hcs_healthcare_intake$My.Score., hcs_healthcare_intake$hos_er, correlation = "spearman", alterantive = "less")
 ```
 
-Let's look at the matched first baseline and first follow-up and see if there are differences
+Predictive validity data cleaning
 ```{r}
 hcs_healthcare$client_id_time_point = paste0(hcs_healthcare$Client.ID, hcs_healthcare$Time.point)
 hcs_healthcare = distinct(hcs_healthcare, client_id_time_point, .keep_all = TRUE)
@@ -174,9 +173,9 @@ hcs_healthcare = subset(hcs_healthcare, bad_date == 0)
 hcs_healthcare
 ### Create BHC diff and ER diff scores
 hcs_healthcare$bhcs_diff = hcs_healthcare$My.Score..y - hcs_healthcare$My.Score..x
-hcs_healthcare$inpat_med_diff = hcs_healthcare$days_inpatient_medical.y - hcs_healthcare$days_inpatient_medical.x
-hcs_healthcare$inpat_mental_diff = hcs_healthcare$days_inpatient_psychiatric.y - hcs_healthcare$days_inpatient_psychiatric.x
-hcs_healthcare$er_diff = hcs_healthcare$er_visits.y - hcs_healthcare$er_visits.x
+
+hcs_healthcare$hos_er_diff = (hcs_healthcare$days_inpatient_medical.y + hcs_healthcare$days_inpatient_psychiatric.y + hcs_healthcare$er_visits.y) - (hcs_healthcare$days_inpatient_medical.x + hcs_healthcare$days_inpatient_psychiatric.x + hcs_healthcare$er_visits.x)
+
 ```
 Predictive validity: changes in HCS scores related to changes healthcare useage for matched first basline and first follow-up
 Just use complete data set easier
@@ -192,17 +191,21 @@ apply(hcs_healthcare[,20:22], 2, function(x){describe.factor(x)})
 mean(hcs_healthcare$bhcs_diff)
 sd(hcs_healthcare$bhcs_diff)
 ```
-Look at correlations for first differneces 
+Predictive for differences
+```{r}
+cor.test(hcs_healthcare$bhcs_diff, hcs_healthcare$hos_er_diff, method = "spearman", alternative = "less")
+
+```
+Let's try intake BHCS scores with changes in healthcare utilization
 ```{r}
 
-list_fun = data.frame(inpat_med_diff = hcs_healthcare$inpat_med_diff, inpat_mental_diff = hcs_healthcare$inpat_mental_diff, er_diff = hcs_healthcare$er_diff)
-list_output = list()
 
-for(i in 1:length(list_fun)){
-list_output[[i]] = cor.test(hcs_healthcare$bhcs_diff, list_fun[[i]], cor = "spearman")
-}
-list_output
+
+
 ```
+
+
+
 ####################################
 Healthcare cost analysis health home
 ####################################
